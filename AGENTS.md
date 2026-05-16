@@ -8,6 +8,7 @@
 
 ```bash
 swift build
+make build
 ```
 
 Run locally:
@@ -15,6 +16,13 @@ Run locally:
 ```bash
 swift build
 swift run UnfairDaemon serve
+```
+
+iOS Theos package:
+
+```bash
+make package
+make THEOS_PACKAGE_SCHEME= package
 ```
 
 ## API
@@ -49,7 +57,11 @@ These are fixed runtime contracts.
 
 ## Deploy
 
-Use the scripts in `deploy/` for install and service management.
+Use the scripts in `deploy/` for macOS install and service management.
+
+Use Theos package output from `debs/` for iOS apt install. The launchd label is `wiki.qaq.unfaird`.
+
+The iOS runtime requires jailbreak-provided `libjailbreak.dylib` and `appinst`. `UnfairSupport` loads `libjailbreak.dylib` to initialize jailbreak primitives, set root MAC label, and mark current process with platform binary csflags before app bundle decryption.
 
 Keep tracked docs and agent notes free of private deployment details:
 
