@@ -8,6 +8,16 @@ enum RuntimeEnvironment {
             return URL(fileURLWithPath: tmpDir, isDirectory: true).standardizedFileURL
         }
 
+        #if os(iOS)
+        let temporaryDirectory = URL(fileURLWithPath: "/var/folders/bg/unfaird/T", isDirectory: true)
+        let packageRoot = temporaryDirectory
+            .deletingLastPathComponent()
+            .appendingPathComponent("X", isDirectory: true)
+        try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: packageRoot, withIntermediateDirectories: true)
+        return temporaryDirectory.standardizedFileURL
+        #else
+
         let foldersRoot = URL(fileURLWithPath: "/var/folders/bg", isDirectory: true)
         let candidates = try FileManager.default.contentsOfDirectory(
             at: foldersRoot,
@@ -28,6 +38,7 @@ enum RuntimeEnvironment {
         }
 
         throw Abort(.internalServerError, reason: "TMPDIR environment variable missing and /var/folders/bg has no T/X temp root")
+        #endif
     }
 
     private static func isDirectory(_ url: URL) -> Bool {

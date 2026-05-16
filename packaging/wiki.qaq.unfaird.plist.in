@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>wiki.qaq.unfaird</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>@INSTALL_PREFIX@/usr/local/lib/unfaird/UnfairDaemon</string>
+        <string>serve</string>
+        <string>--hostname</string>
+        <string>0.0.0.0</string>
+        <string>--port</string>
+        <string>6347</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>POSIXSpawnType</key>
+    <string>Interactive</string>
+    <key>JetsamProperties</key>
+    <dict>
+        <key>JetsamMemoryLimit</key>
+        <integer>524288</integer>
+        <key>JetsamPriority</key>
+        <integer>-49</integer>
+    </dict>
+    <key>WorkingDirectory</key>
+    <string>/var/tmp/unfaird</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>DYLD_LIBRARY_PATH</key>
+        <string>@DYLD_LIBRARY_PATH@</string>
+        <key>PATH</key>
+        <string>@LAUNCHD_PATH@</string>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/var/tmp/unfaird/logs/unfaird.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/tmp/unfaird/logs/unfaird.err</string>
+</dict>
+</plist>

@@ -1,0 +1,82 @@
+#!/bin/sh
+set -e
+
+LABEL="wiki.qaq.unfaird"
+
+resolve_prefix() {
+  if [ -x /var/jb/usr/local/lib/unfaird/UnfairDaemon ] || [ -f /var/jb/Library/LaunchDaemons/$LABEL.plist ]; then
+    printf '%s\n' /var/jb
+    return
+  fi
+  printf '\n'
+}
+
+find_libjailbreak() {
+  prefix="$1"
+  for candidate in \
+    "$prefix/usr/lib/libjailbreak.dylib" \
+    "$prefix/basebin/libjailbreak.dylib" \
+    /basebin/libjailbreak.dylib \
+    /usr/lib/libjailbreak.dylib
+  do
+    if [ -e "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+find_executable() {
+  for candidate in "$@"; do
+    if [ -x "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+PREFIX="$(resolve_prefix)"
+BINARY="$PREFIX/usr/local/lib/unfaird/UnfairDaemon"
+PLIST="$PREFIX/Library/LaunchDaemons/$LABEL.plist"
+
+LIBJAILBREAK="$(find_libjailbreak "$PREFIX" || true)"
+if [ -z "$LIBJAILBREAK" ]; then
+  echo "$LABEL requires libjailbreak.dylib at $PREFIX/usr/lib, $PREFIX/basebin, /basebin, or /usr/lib" >&2
+  exit 1
+fi
+
+APPINST="$(find_executable "$PREFIX/usr/bin/appinst" /usr/bin/appinst /bin/appinst || true)"
+if [ -z "$APPINST" ]; then
+  echo "$LABEL requires appinst at $PREFIX/usr/bin/appinst, /usr/bin/appinst, or /bin/appinst" >&2
+  exit 1
+fi
+
+install -d -m 0755 /var/tmp/unfaird/jobs /var/tmp/unfaird/logs /var/folders/bg/unfaird/T /var/folders/bg/unfaird/X
+chown -R root:wheel /var/tmp/unfaird /var/folders/bg/unfaird 2>/dev/null || true
+chmod 0700 /var/tmp/unfaird/jobs
+chmod 0755 /var/tmp/unfaird/logs /var/folders/bg/unfaird/T /var/folders/bg/unfaird/X
+
+chown root:wheel "$BINARY" "$PLIST" 2>/dev/null || true
+chmod 0755 "$BINARY"
+chmod 0644 "$PLIST"
+
+if ! command -v launchctl >/dev/null 2>&1; then
+  echo "$LABEL requires launchctl" >&2
+  exit 1
+fi
+
+launchctl bootout system/$LABEL >/dev/null 2>&1 || true
+if launchctl bootstrap system "$PLIST" >/var/tmp/unfaird/launchctl.log 2>&1; then
+  launchctl enable system/$LABEL >/dev/null 2>&1 || true
+  launchctl kickstart -k system/$LABEL >/dev/null 2>&1 || true
+elif launchctl load -w "$PLIST" >>/var/tmp/unfaird/launchctl.log 2>&1; then
+  :
+else
+  echo "$LABEL launchctl load failed" >&2
+  cat /var/tmp/unfaird/launchctl.log >&2
+  exit 1
+fi
+
+exit 0

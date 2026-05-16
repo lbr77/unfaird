@@ -1,6 +1,9 @@
 .DS_Store
 .build/
 .swiftpm/
+.pi/
+.theos/
+debs/
 DerivedData/
 *.xcodeproj
 *.ipa

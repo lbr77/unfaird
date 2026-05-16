@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import UnfairDaemonSupport
 import UnfairKit
 import Vapor
 
@@ -24,7 +25,12 @@ struct Serve: ParsableCommand {
     var port = 6347
 
     func run() throws {
+        #if os(macOS)
         try checkSupportedOS()
+        #endif
+        #if os(iOS)
+        try raiseJetsamLimit(megabytes: 512)
+        #endif
 
         var env = try Environment.detect()
         try LoggingSystem.bootstrap(from: &env)
@@ -65,6 +71,16 @@ struct Package: ParsableCommand {
 
 private func fileURL(_ path: String) -> URL {
     URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
+}
+
+private func raiseJetsamLimit(megabytes: Int32) throws {
+    var message = [CChar](repeating: 0, count: 512)
+    let result = message.withUnsafeMutableBufferPointer { buffer in
+        unfaird_raise_jetsam_limit(megabytes, buffer.baseAddress, buffer.count)
+    }
+    guard result == 0 else {
+        throw ValidationError(String(cString: message))
+    }
 }
 
 private func checkSupportedOS() throws {

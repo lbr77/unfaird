@@ -82,7 +82,7 @@ struct DecryptService {
         for job: DecryptJob,
         inputURL: URL,
         packageWorkingDirectory: URL,
-        sandboxProfileURL: URL
+        sandboxProfileURL: URL?
     ) throws -> PosixSpawnResult {
         let arguments = [
             "package",

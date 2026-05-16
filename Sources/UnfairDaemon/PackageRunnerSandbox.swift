@@ -10,7 +10,10 @@ enum PackageRunnerSandbox {
             .standardizedFileURL
     }
 
-    static func writeProfile(jobDirectory: URL) throws -> URL {
+    static func writeProfile(jobDirectory: URL) throws -> URL? {
+        #if os(iOS)
+        return nil
+        #else
         guard FileManager.default.isExecutableFile(atPath: sandboxExecPath) else {
             throw Abort(.internalServerError, reason: "sandbox-exec missing")
         }
@@ -40,6 +43,7 @@ enum PackageRunnerSandbox {
         let profileURL = jobDirectory.appendingPathComponent("sandbox.sb")
         try profile.write(to: profileURL, atomically: true, encoding: .utf8)
         return profileURL
+        #endif
     }
 
     private static func runtimeTemporaryContainerRoot() throws -> URL {
