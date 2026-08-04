@@ -59,12 +59,12 @@ struct Package: ParsableCommand {
     var verbose = false
 
     func run() throws {
-        try PackageProcessor(logger: UnfairLogger(verbose: verbose) { message in
-            print(message)
-        }).process(
+        try PackageExecution.process(
             input: fileURL(input),
             output: fileURL(output),
-            workingDirectory: workingDirectory.map(fileURL)
+            workingDirectory: workingDirectory.map(fileURL),
+            verbose: verbose,
+            log: { print($0) }
         )
     }
 }

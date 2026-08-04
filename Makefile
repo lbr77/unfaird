@@ -3,14 +3,15 @@ SHELL := /bin/bash
 THEOS ?= $(HOME)/theos
 THEOS_PACKAGE_SCHEME ?= rootless
 THEOS_PACKAGE_DIR_NAME ?= debs
-TARGET := iphone:clang:latest:13.0
+TARGET := iphone:clang:latest:17.0
 ARCHS := arm64
 
 PACKAGE_NAME := wiki.qaq.unfaird
 EXECUTABLE_NAME := UnfairDaemon
 BUILD_INFO := Sources/UnfairDaemon/BuildInfo.swift
-IOS_TARGET := arm64-apple-ios13.0
+IOS_TARGET := arm64-apple-ios17.0
 IOS_BUILD_DIR := .build/ios-release
+IOS_SCRATCH_DIR := .build-ios
 IPHONEOS_SDK_PATH := $(shell xcrun --sdk iphoneos --show-sdk-path 2>/dev/null)
 LDID ?= $(shell command -v ldid 2>/dev/null)
 ifeq ($(LDID),)
@@ -19,13 +20,14 @@ endif
 SWIFT_STDLIB_TOOL ?= $(shell xcrun --find swift-stdlib-tool 2>/dev/null)
 
 IOS_SWIFT_FLAGS := \
+	--build-system native \
+	--triple $(IOS_TARGET) \
 	-Xswiftc -sdk -Xswiftc "$(IPHONEOS_SDK_PATH)" \
-	-Xswiftc -target -Xswiftc $(IOS_TARGET) \
 	-Xcc -arch -Xcc arm64 \
 	-Xcc --target=$(IOS_TARGET) \
 	-Xcc -isysroot -Xcc "$(IPHONEOS_SDK_PATH)" \
-	-Xcc -mios-version-min=13.0 \
-	-Xcc -miphoneos-version-min=13.0
+	-Xcc -mios-version-min=17.0 \
+	-Xcc -miphoneos-version-min=17.0
 
 .PHONY: all build release ios-release mac-install mac-uninstall generate-build-info clean-package
 
@@ -65,8 +67,8 @@ ios-release:
 	restore() { cp "$$original" "$(BUILD_INFO)"; rm -f "$$original"; }; \
 	trap restore EXIT; \
 	$(MAKE) generate-build-info; \
-	bin_dir="$$(swift build -c release --product "$(EXECUTABLE_NAME)" --show-bin-path $(IOS_SWIFT_FLAGS))"; \
-	swift build -c release --product "$(EXECUTABLE_NAME)" $(IOS_SWIFT_FLAGS); \
+	bin_dir="$$(swift build --scratch-path "$(IOS_SCRATCH_DIR)" -c release --product "$(EXECUTABLE_NAME)" --show-bin-path $(IOS_SWIFT_FLAGS))"; \
+	swift build --scratch-path "$(IOS_SCRATCH_DIR)" -c release --product "$(EXECUTABLE_NAME)" $(IOS_SWIFT_FLAGS); \
 	rm -rf "$(IOS_BUILD_DIR)"; \
 	install -d "$(IOS_BUILD_DIR)"; \
 	install -m 0755 "$$bin_dir/$(EXECUTABLE_NAME)" "$(IOS_BUILD_DIR)/$(EXECUTABLE_NAME)"; \

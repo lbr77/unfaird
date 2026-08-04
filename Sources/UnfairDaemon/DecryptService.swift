@@ -51,19 +51,18 @@ struct DecryptService {
         )
         defer { reservation.release() }
 
-        let packageWorkingDirectory = try PackageRunnerSandbox.packageWorkingDirectory(for: job.id)
+        let packageWorkingDirectory = try PackageWorkspace.workingDirectory(for: job.id)
         try FileManager.default.createDirectory(at: packageWorkingDirectory, withIntermediateDirectories: true)
         let packageInputURL = packageWorkingDirectory.appendingPathComponent("input.ipa")
 
         try write(upload, to: packageInputURL)
         try writeMetadata(job.metadata, in: job.directoryURL)
 
-        let sandboxProfileURL = try PackageRunnerSandbox.writeProfile(jobDirectory: job.directoryURL)
-        let result = try runDecryptRunner(
-            for: job,
-            inputURL: packageInputURL,
-            packageWorkingDirectory: packageWorkingDirectory,
-            sandboxProfileURL: sandboxProfileURL
+        let result = PackageExecution.run(
+            input: packageInputURL,
+            output: job.outputURL,
+            workingDirectory: packageWorkingDirectory,
+            verbose: true
         )
         return response(for: result, job: job)
     }
@@ -78,34 +77,12 @@ struct DecryptService {
         return directory.appendingPathComponent("output.ipa")
     }
 
-    private func runDecryptRunner(
-        for job: DecryptJob,
-        inputURL: URL,
-        packageWorkingDirectory: URL,
-        sandboxProfileURL: URL?
-    ) throws -> PosixSpawnResult {
-        let arguments = [
-            "package",
-            "--input", inputURL.path,
-            "--output", job.outputURL.path,
-            "--working-directory", packageWorkingDirectory.path,
-            "--verbose",
-        ]
-        return try PosixSpawn.run(
-            executablePath: Self.currentExecutablePath(),
-            arguments: arguments,
-            workingDirectory: job.directoryURL,
-            sandboxProfileURL: sandboxProfileURL,
-            timeoutSeconds: Self.runnerTimeoutSeconds
-        )
-    }
-
-    private func response(for result: PosixSpawnResult, job: DecryptJob) -> DecryptResponse {
+    private func response(for result: PackageExecutionResult, job: DecryptJob) -> DecryptResponse {
         DecryptResponse(
             exit: DecryptExit(
                 code: result.exitCode,
-                stdout: result.stdoutString,
-                stderr: result.stderrString,
+                stdout: result.stdout,
+                stderr: result.stderr,
                 downloadURL: job.downloadURL,
                 validateUntil: job.validateUntil
             )
@@ -196,17 +173,6 @@ struct DecryptService {
 
     private static func currentTimestamp() -> Int {
         Int(Date().timeIntervalSince1970)
-    }
-
-    private static func currentExecutablePath() -> String {
-        let path = CommandLine.arguments[0]
-        if path.hasPrefix("/") {
-            return path
-        }
-        return URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-            .appendingPathComponent(path)
-            .standardizedFileURL
-            .path
     }
 
     private func validate(_ upload: DecryptUpload) throws {

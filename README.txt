@@ -14,7 +14,7 @@ macOS launchd install:
   make mac-uninstall
 
 iOS requirements:
-  Theos, iPhoneOS SDK, ldid, appinst, libjailbreak.dylib
+  Theos, iPhoneOS SDK, ldid, libjailbreak.dylib
 
 libjailbreak paths:
   /var/jb/usr/lib/libjailbreak.dylib
@@ -29,6 +29,18 @@ Rootful iOS package:
 
 Install on device:
   apt install ./wiki.qaq.unfaird_<version>_iphoneos-arm64.deb
+
+Manual iOS package processing:
+  DYLD_LIBRARY_PATH=/var/jb/basebin:/var/jb/usr/lib:/usr/lib \
+    UnfairDaemon package --input input.ipa --output output.ipa --verbose
+
+Manual iOS HTTP service:
+  DYLD_LIBRARY_PATH=/var/jb/basebin:/var/jb/usr/lib:/usr/lib \
+    UnfairDaemon serve --hostname 127.0.0.1 --port 6347
+
+The iOS process decrypts in-process. Encrypted binaries are staged at the
+canonical app container root, then their file-backed mappings are promoted
+through the configured kernel primitives before mremap_encrypted.
 
 launchd service:
   launchctl print system/wiki.qaq.unfaird
