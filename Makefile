@@ -3,13 +3,13 @@ SHELL := /bin/bash
 THEOS ?= $(HOME)/theos
 THEOS_PACKAGE_SCHEME ?= rootless
 THEOS_PACKAGE_DIR_NAME ?= debs
-TARGET := iphone:clang:latest:17.0
+TARGET := iphone:clang:latest:15.0
 ARCHS := arm64
 
 PACKAGE_NAME := wiki.qaq.unfaird
 EXECUTABLE_NAME := UnfairDaemon
 BUILD_INFO := Sources/UnfairDaemon/BuildInfo.swift
-IOS_TARGET := arm64-apple-ios17.0
+IOS_TARGET := arm64-apple-ios15.0
 IOS_BUILD_DIR := .build/ios-release
 IOS_SCRATCH_DIR := .build-ios
 IPHONEOS_SDK_PATH := $(shell xcrun --sdk iphoneos --show-sdk-path 2>/dev/null)
@@ -26,8 +26,8 @@ IOS_SWIFT_FLAGS := \
 	-Xcc -arch -Xcc arm64 \
 	-Xcc --target=$(IOS_TARGET) \
 	-Xcc -isysroot -Xcc "$(IPHONEOS_SDK_PATH)" \
-	-Xcc -mios-version-min=17.0 \
-	-Xcc -miphoneos-version-min=17.0
+	-Xcc -mios-version-min=15.0 \
+	-Xcc -miphoneos-version-min=15.0
 
 .PHONY: all build release ios-release mac-install mac-uninstall generate-build-info clean-package
 

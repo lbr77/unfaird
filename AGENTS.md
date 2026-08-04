@@ -52,8 +52,8 @@ These are fixed runtime contracts.
 - Resolve `$TMPDIR` dynamically at process runtime. Launchd can change it across daemon starts.
 - Do not override, rewrite, or sandbox-remap `TMPDIR` for decrypt/package runs.
 - Serialize package processing because UnfairKit changes the process working directory while decrypting staged binaries.
-- Keep A15+ encrypted mapping promotion thread-scoped to the serialized package operation.
-- Run the iOS daemon as root, retain its original process credential, clear only its private sandbox slot, and leave `kern_ucred` untouched.
+- Keep the KRW mapping transition thread-scoped to the serialized package operation: map the vnode read-only, promote it to executable for `mremap_encrypted`, restore its original read-only VM flags, then copy the plaintext.
+- Run the iOS daemon as root. Modern XNU retains the process credential and clears its private sandbox slot. XNU 8020 scopes a kernel-credential lease from file-signature registration through VM-flag restoration, then restores the kernel MAC label and original credential before reading plaintext.
 - Preserve mtime and chmod from the IPA entries during extraction and when replacing entries in the output IPA.
 - Keep temporary `.sinf` copies metadata-preserving.
 
@@ -63,7 +63,7 @@ Use the scripts in `deploy/` for macOS install and service management.
 
 Use Theos package output from `debs/` for iOS apt install. The launchd label is `wiki.qaq.unfaird`.
 
-The iOS runtime requires jailbreak-provided `libjailbreak.dylib`. The daemon loads its kernel primitives and current-device offsets, stages encrypted binaries under `/var/containers/Bundle/Application`, and promotes the encrypted file mapping before `mremap_encrypted`.
+The iOS runtime requires jailbreak-provided `libjailbreak.dylib`. Rootless and roothide share one runtime path: resolve the jailbreak library through dyld or `/var/jb`, stage encrypted binaries under `/var/containers/Bundle/Application`, and use the same reversible KRW mapping transition around `mremap_encrypted`.
 
 Keep tracked docs and agent notes free of private deployment details:
 

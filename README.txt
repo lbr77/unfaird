@@ -38,9 +38,13 @@ Manual iOS HTTP service:
   DYLD_LIBRARY_PATH=/var/jb/basebin:/var/jb/usr/lib:/usr/lib \
     UnfairDaemon serve --hostname 127.0.0.1 --port 6347
 
-The iOS process decrypts in-process. Encrypted binaries are staged at the
-canonical app container root, then their file-backed mappings are promoted
-through the configured kernel primitives before mremap_encrypted.
+The iOS process decrypts in-process on rootless and roothide environments.
+Encrypted binaries are staged at the canonical app container root. Every device
+uses the same mapping lifecycle: map the vnode read-only, promote its VM entry
+to executable with kernel primitives, call mremap_encrypted, restore the exact
+read-only VM flags, and copy the decrypted bytes.
+XNU 8020 also scopes its legacy kernel credential across signature registration
+and mremap_encrypted, then restores the original credential before the copy.
 
 launchd service:
   launchctl print system/wiki.qaq.unfaird

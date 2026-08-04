@@ -8,6 +8,10 @@ struct PackageExecutionResult {
     let stderr: String
 }
 
+private struct EncryptedMappingLifecycleError: Error, CustomStringConvertible {
+    let description: String
+}
+
 enum PackageExecution {
     private static let lock = NSLock()
 
@@ -21,14 +25,35 @@ enum PackageExecution {
         lock.lock()
         defer { lock.unlock() }
 
-        try prepareKernelDecryption()
         unfaird_set_mapping_promotion_enabled(true)
         defer { unfaird_set_mapping_promotion_enabled(false) }
 
         try PackageProcessor(
             logger: UnfairLogger(verbose: verbose, log: log),
+            decryptionPreparer: prepareEncryptedRegion,
             encryptedRegionMapper: { address, size, protection, flags, fd, offset in
-                unfaird_map_encrypted_region(address, size, protection, flags, fd, offset)
+                guard let mapping = unfaird_map_encrypted_region(
+                    address,
+                    size,
+                    protection,
+                    flags,
+                    fd,
+                    offset
+                ),
+                      mapping != MAP_FAILED
+                else {
+                    return nil
+                }
+                return BinaryDecryptor.EncryptedRegionMapping(
+                    address: mapping,
+                    restoreReadProtection: {
+                        guard unfaird_restore_encrypted_region(mapping, size) == 0 else {
+                            throw EncryptedMappingLifecycleError(
+                                description: String(cString: unfaird_last_mapping_error())
+                            )
+                        }
+                    }
+                )
             }
         ).process(
             input: input,
@@ -68,13 +93,21 @@ enum PackageExecution {
         }
     }
 
-    private static func prepareKernelDecryption() throws {
+    private static func prepareEncryptedRegion() throws -> BinaryDecryptor.DecryptionPreparation {
         var message = [CChar](repeating: 0, count: 512)
-        let result = message.withUnsafeMutableBufferPointer { buffer in
-            unfaird_prepare_kernel_decryption(buffer.baseAddress, buffer.count)
+        let status = message.withUnsafeMutableBufferPointer { buffer in
+            unfaird_prepare_encrypted_region(buffer.baseAddress, buffer.count)
         }
-        guard result == 0 else {
-            throw PackageExecutionError.kernelPreparation(String(cString: message))
+        guard status == 0 else {
+            throw EncryptedMappingLifecycleError(description: String(cString: message))
+        }
+
+        return BinaryDecryptor.DecryptionPreparation {
+            guard unfaird_finish_encrypted_region_preparation() == 0 else {
+                throw EncryptedMappingLifecycleError(
+                    description: String(cString: unfaird_last_mapping_error())
+                )
+            }
         }
     }
 
@@ -83,16 +116,5 @@ enum PackageExecution {
             return ""
         }
         return lines.joined(separator: "\n") + "\n"
-    }
-}
-
-private enum PackageExecutionError: Error, CustomStringConvertible {
-    case kernelPreparation(String)
-
-    var description: String {
-        switch self {
-        case .kernelPreparation(let message):
-            return "kernel decryption preparation failed: \(message)"
-        }
     }
 }
