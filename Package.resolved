@@ -244,14 +244,6 @@
       }
     },
     {
-      "identity" : "unfair",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/lbr77/unfair.git",
-      "state" : {
-        "revision" : "503484cc7f0c96a0aad4310b40abcd93f91d5e2a"
-      }
-    },
-    {
       "identity" : "vapor",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/vapor.git",

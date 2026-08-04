@@ -3,7 +3,24 @@ set -e
 
 LABEL="wiki.qaq.unfaird"
 
+# Mirrors postinst: derive the scheme prefix from this script's own path.
 resolve_prefix() {
+  if [ -n "${JBROOT:-}" ] && [ -d "$JBROOT" ]; then
+    printf '%s\n' "${JBROOT%/}"
+    return
+  fi
+
+  case "$0" in
+    /*/var/lib/dpkg/info/*)
+      printf '%s\n' "${0%/var/lib/dpkg/info/*}"
+      return
+      ;;
+    /var/lib/dpkg/info/*)
+      printf '\n'
+      return
+      ;;
+  esac
+
   if [ -f /var/jb/Library/LaunchDaemons/$LABEL.plist ]; then
     printf '%s\n' /var/jb
     return
@@ -17,7 +34,7 @@ PLIST="$PREFIX/Library/LaunchDaemons/$LABEL.plist"
 case "$1" in
   remove|upgrade|deconfigure)
     if command -v launchctl >/dev/null 2>&1; then
-      launchctl bootout system/wiki.qaq.unfaird >/dev/null 2>&1 || launchctl unload "$PLIST" >/dev/null 2>&1 || true
+      launchctl bootout system/$LABEL >/dev/null 2>&1 || launchctl unload "$PLIST" >/dev/null 2>&1 || true
     fi
     ;;
 esac

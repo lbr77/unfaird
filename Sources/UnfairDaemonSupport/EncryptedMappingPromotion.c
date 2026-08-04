@@ -2,6 +2,7 @@
 
 #include <dlfcn.h>
 #include <errno.h>
+#include <limits.h>
 #include <mach/mach.h>
 #include <pthread.h>
 #include <stdarg.h>
@@ -113,11 +114,36 @@ static void *unfaird_open_libjailbreak(char *error, size_t error_size) {
         return RTLD_DEFAULT;
     }
 
+    // Roothide relocates the whole jailbreak root to a randomized jbroot, so the
+    // launchd plist hands the resolved prefix down as UNFAIRD_JB_PREFIX. Rootless
+    // and rootful keep working through the fixed paths below.
+    const char *prefix = getenv("UNFAIRD_JB_PREFIX");
+    if (prefix != NULL && prefix[0] != '\0') {
+        const char *suffixes[] = {
+            "/basebin/libjailbreak.dylib",
+            "/usr/lib/libjailbreak.dylib",
+        };
+        for (size_t index = 0; index < sizeof(suffixes) / sizeof(suffixes[0]); index++) {
+            char path[PATH_MAX];
+            int written = snprintf(path, sizeof(path), "%s%s", prefix, suffixes[index]);
+            if (written <= 0 || (size_t)written >= sizeof(path)) {
+                continue;
+            }
+            void *handle = dlopen(path, RTLD_NOW | RTLD_LOCAL);
+            if (handle != NULL) {
+                return handle;
+            }
+        }
+    }
+
     const char *paths[] = {
         "/private/var/tmp/libjailbreak.dylib",
         "/var/jb/basebin/libjailbreak.dylib",
         "/var/jb/usr/lib/libjailbreak.dylib",
         "/basebin/libjailbreak.dylib",
+        // Last resort: let dyld search DYLD_LIBRARY_PATH, which postinst points
+        // at the directory the jailbreak library was actually found in.
+        "libjailbreak.dylib",
     };
     for (size_t index = 0; index < sizeof(paths) / sizeof(paths[0]); index++) {
         void *handle = dlopen(paths[index], RTLD_NOW | RTLD_LOCAL);

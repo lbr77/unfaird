@@ -1,0 +1,18 @@
+repository: https://github.com/lbr77/unfair.git
+revision:   503484cc7f0c96a0aad4310b40abcd93f91d5e2a
+subject:    Scope custom decryption preparation
+
+Vendored copy of UnfairKit / UnfairSupport. Re-sync with:
+
+    scripts/vendor-unfair.sh [revision]
+
+Only Package.swift, LICENSE, README.txt, Sources/ and Tests/ are vendored.
+Upstream CI, Makefile and build scripts are intentionally left out.
+
+Do not edit files under Sources/ or Tests/ directly. Land the change upstream
+first, then re-run the sync script, otherwise the next sync silently reverts it.
+
+Note: upstream `main` has since dropped `BinaryDecryptor.DecryptionPreparer` and
+`BinaryDecryptor.EncryptedRegionMapper`, which Sources/UnfairDaemon/PackageExecution.swift
+injects the kernel mapping transition through. Moving this pin forward requires
+re-basing those hooks first.
