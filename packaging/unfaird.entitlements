@@ -12,7 +12,19 @@
     <true/>
     <key>com.apple.private.security.no-sandbox</key>
     <true/>
+    <key>com.apple.private.security.storage.AppBundles</key>
+    <true/>
     <key>com.apple.private.skip-library-validation</key>
+    <true/>
+    <key>com.apple.private.cs.debugger</key>
+    <true/>
+    <key>com.apple.security.get-task-allow</key>
+    <true/>
+    <key>get-task-allow</key>
+    <true/>
+    <key>run-unsigned-code</key>
+    <true/>
+    <key>dynamic-codesigning</key>
     <true/>
     <key>com.apple.security.exception.iokit-user-client-class</key>
     <array>

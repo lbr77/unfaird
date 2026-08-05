@@ -3,7 +3,27 @@ set -e
 
 LABEL="wiki.qaq.unfaird"
 
+# The install prefix differs per package scheme: "" for rootful, /var/jb for
+# rootless, and a randomized jbroot for roothide. dpkg runs this script from
+# <prefix>/var/lib/dpkg/info, so $0 carries the prefix on every scheme.
 resolve_prefix() {
+  if [ -n "${JBROOT:-}" ] && [ -d "$JBROOT" ]; then
+    printf '%s\n' "${JBROOT%/}"
+    return
+  fi
+
+  case "$0" in
+    /*/var/lib/dpkg/info/*)
+      printf '%s\n' "${0%/var/lib/dpkg/info/*}"
+      return
+      ;;
+    /var/lib/dpkg/info/*)
+      printf '\n'
+      return
+      ;;
+  esac
+
+  # Fallbacks for manual invocation outside dpkg.
   if [ -x /var/jb/usr/local/lib/unfaird/UnfairDaemon ] || [ -f /var/jb/Library/LaunchDaemons/$LABEL.plist ]; then
     printf '%s\n' /var/jb
     return
@@ -16,6 +36,8 @@ find_libjailbreak() {
   for candidate in \
     "$prefix/usr/lib/libjailbreak.dylib" \
     "$prefix/basebin/libjailbreak.dylib" \
+    /var/jb/usr/lib/libjailbreak.dylib \
+    /var/jb/basebin/libjailbreak.dylib \
     /basebin/libjailbreak.dylib \
     /usr/lib/libjailbreak.dylib
   do
@@ -27,31 +49,55 @@ find_libjailbreak() {
   return 1
 }
 
-find_executable() {
-  for candidate in "$@"; do
-    if [ -x "$candidate" ]; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
-  return 1
+# The staged plist ships with @INSTALL_PREFIX@/@DYLD_LIBRARY_PATH@/@LAUNCHD_PATH@
+# placeholders because roothide's jbroot is only known here, on device.
+render_plist() {
+  template="$1"
+  plist="$2"
+  prefix="$3"
+  libjailbreak_dir="$4"
+
+  if [ -n "$prefix" ]; then
+    dyld_library_path="$prefix/usr/local/lib/unfaird:$prefix/usr/lib:$prefix/basebin:/usr/lib:/basebin"
+    launchd_path="$prefix/usr/bin:$prefix/bin:$prefix/usr/sbin:$prefix/sbin:/usr/bin:/bin:/usr/sbin:/sbin"
+  else
+    dyld_library_path="/usr/local/lib/unfaird:/usr/lib:/basebin"
+    launchd_path="/usr/bin:/bin:/usr/sbin:/sbin"
+  fi
+  if [ -n "$libjailbreak_dir" ]; then
+    dyld_library_path="$libjailbreak_dir:$dyld_library_path"
+  fi
+
+  tmp="$plist.unfaird-tmp"
+  sed \
+    -e "s|@INSTALL_PREFIX@|$prefix|g" \
+    -e "s|@DYLD_LIBRARY_PATH@|$dyld_library_path|g" \
+    -e "s|@LAUNCHD_PATH@|$launchd_path|g" \
+    "$template" > "$tmp"
+  mv "$tmp" "$plist"
 }
 
 PREFIX="$(resolve_prefix)"
 BINARY="$PREFIX/usr/local/lib/unfaird/UnfairDaemon"
+PLIST_TEMPLATE="$PREFIX/Library/LaunchDaemons/$LABEL.plist.in"
 PLIST="$PREFIX/Library/LaunchDaemons/$LABEL.plist"
+
+if [ ! -x "$BINARY" ]; then
+  echo "$LABEL cannot find its daemon at $BINARY" >&2
+  exit 1
+fi
+if [ ! -f "$PLIST_TEMPLATE" ]; then
+  echo "$LABEL cannot find its launchd plist template at $PLIST_TEMPLATE" >&2
+  exit 1
+fi
 
 LIBJAILBREAK="$(find_libjailbreak "$PREFIX" || true)"
 if [ -z "$LIBJAILBREAK" ]; then
-  echo "$LABEL requires libjailbreak.dylib at $PREFIX/usr/lib, $PREFIX/basebin, /basebin, or /usr/lib" >&2
+  echo "$LABEL requires libjailbreak.dylib under $PREFIX/usr/lib, $PREFIX/basebin, /basebin, or /usr/lib" >&2
   exit 1
 fi
 
-APPINST="$(find_executable "$PREFIX/usr/bin/appinst" /usr/bin/appinst /bin/appinst || true)"
-if [ -z "$APPINST" ]; then
-  echo "$LABEL requires appinst at $PREFIX/usr/bin/appinst, /usr/bin/appinst, or /bin/appinst" >&2
-  exit 1
-fi
+render_plist "$PLIST_TEMPLATE" "$PLIST" "$PREFIX" "$(dirname "$LIBJAILBREAK")"
 
 install -d -m 0755 /var/tmp/unfaird/jobs /var/tmp/unfaird/logs /var/folders/bg/unfaird/T /var/folders/bg/unfaird/X
 chown -R root:wheel /var/tmp/unfaird /var/folders/bg/unfaird 2>/dev/null || true

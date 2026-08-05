@@ -1,5 +1,7 @@
 .DS_Store
 .build/
+.build-ios/
+build/
 .swiftpm/
 .pi/
 .theos/
@@ -9,4 +11,4 @@ DerivedData/
 *.ipa
 *.xcarchive
 References/
-Package.resolved
+unfaird-panic-*.ips

@@ -1,0 +1,13 @@
+repository: https://github.com/lbr77/unfair.git
+revision:   ddd3252471f28585569092747aeb4dc650874bfc
+subject:    Use read-only model encryption mappings
+
+Vendored copy of UnfairKit / UnfairSupport. Re-sync with:
+
+    scripts/vendor-unfair.sh [revision]
+
+Only Package.swift, LICENSE, README.txt, Sources/ and Tests/ are vendored.
+Upstream CI, Makefile and build scripts are intentionally left out.
+
+Do not edit files under Sources/ or Tests/ directly. Land the change upstream
+first, then re-run the sync script, otherwise the next sync silently reverts it.

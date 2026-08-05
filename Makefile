@@ -3,14 +3,15 @@ SHELL := /bin/bash
 THEOS ?= $(HOME)/theos
 THEOS_PACKAGE_SCHEME ?= rootless
 THEOS_PACKAGE_DIR_NAME ?= debs
-TARGET := iphone:clang:latest:13.0
+TARGET := iphone:clang:latest:15.0
 ARCHS := arm64
 
 PACKAGE_NAME := wiki.qaq.unfaird
 EXECUTABLE_NAME := UnfairDaemon
 BUILD_INFO := Sources/UnfairDaemon/BuildInfo.swift
-IOS_TARGET := arm64-apple-ios13.0
+IOS_TARGET := arm64-apple-ios15.0
 IOS_BUILD_DIR := .build/ios-release
+IOS_SCRATCH_DIR := .build-ios
 IPHONEOS_SDK_PATH := $(shell xcrun --sdk iphoneos --show-sdk-path 2>/dev/null)
 LDID ?= $(shell command -v ldid 2>/dev/null)
 ifeq ($(LDID),)
@@ -19,15 +20,16 @@ endif
 SWIFT_STDLIB_TOOL ?= $(shell xcrun --find swift-stdlib-tool 2>/dev/null)
 
 IOS_SWIFT_FLAGS := \
+	--build-system native \
+	--triple $(IOS_TARGET) \
 	-Xswiftc -sdk -Xswiftc "$(IPHONEOS_SDK_PATH)" \
-	-Xswiftc -target -Xswiftc $(IOS_TARGET) \
 	-Xcc -arch -Xcc arm64 \
 	-Xcc --target=$(IOS_TARGET) \
 	-Xcc -isysroot -Xcc "$(IPHONEOS_SDK_PATH)" \
-	-Xcc -mios-version-min=13.0 \
-	-Xcc -miphoneos-version-min=13.0
+	-Xcc -mios-version-min=15.0 \
+	-Xcc -miphoneos-version-min=15.0
 
-.PHONY: all build release ios-release mac-install mac-uninstall generate-build-info clean-package
+.PHONY: all build release ios-release mac-install mac-uninstall generate-build-info clean-package package-all vendor-unfair
 
 all:: ios-release
 
@@ -65,8 +67,8 @@ ios-release:
 	restore() { cp "$$original" "$(BUILD_INFO)"; rm -f "$$original"; }; \
 	trap restore EXIT; \
 	$(MAKE) generate-build-info; \
-	bin_dir="$$(swift build -c release --product "$(EXECUTABLE_NAME)" --show-bin-path $(IOS_SWIFT_FLAGS))"; \
-	swift build -c release --product "$(EXECUTABLE_NAME)" $(IOS_SWIFT_FLAGS); \
+	bin_dir="$$(swift build --scratch-path "$(IOS_SCRATCH_DIR)" -c release --product "$(EXECUTABLE_NAME)" --show-bin-path $(IOS_SWIFT_FLAGS))"; \
+	swift build --scratch-path "$(IOS_SCRATCH_DIR)" -c release --product "$(EXECUTABLE_NAME)" $(IOS_SWIFT_FLAGS); \
 	rm -rf "$(IOS_BUILD_DIR)"; \
 	install -d "$(IOS_BUILD_DIR)"; \
 	install -m 0755 "$$bin_dir/$(EXECUTABLE_NAME)" "$(IOS_BUILD_DIR)/$(EXECUTABLE_NAME)"; \
@@ -81,33 +83,33 @@ generate-build-info:
 	timestamp="$$(date -u +%Y-%m-%dT%H:%M:%SZ)"; \
 	printf 'enum BuildInfo {\n    static let commit = "%s"\n    static let timestamp = "%s"\n}\n' "$$commit" "$$timestamp" > "$(BUILD_INFO)"
 
+# Builds the rootless and roothide debs in one run. Pass schemes through as
+# `make package-all SCHEMES="rootless roothide"`.
+package-all:
+	bash scripts/package.sh $(SCHEMES)
+
+vendor-unfair:
+	bash scripts/vendor-unfair.sh $(UNFAIR_REVISION)
+
 clean-package:
-	rm -rf "$(IOS_BUILD_DIR)" "$(THEOS_PACKAGE_DIR_NAME)" ".theos"
+	rm -rf "$(IOS_BUILD_DIR)" "$(THEOS_PACKAGE_DIR_NAME)" ".theos" ".build-packaging"
 
 THEOS_GOALS := package stage install show uninstall before-stage internal-stage after-stage before-package internal-package after-package
 ifneq ($(filter $(THEOS_GOALS),$(MAKECMDGOALS)),)
 include $(THEOS)/makefiles/common.mk
 include $(THEOS_MAKE_PATH)/rules.mk
 
+# The launchd plist keeps its @INSTALL_PREFIX@/@DYLD_LIBRARY_PATH@/@LAUNCHD_PATH@
+# placeholders in the package. postinst renders them from the prefix it derives at
+# install time, so one staging layout covers rootful, rootless and roothide. Roothide
+# in particular has an empty THEOS_PACKAGE_INSTALL_PREFIX and a jbroot that is only
+# known on device.
 after-stage:: ios-release
 	@set -euo pipefail; \
-	prefix="$(THEOS_PACKAGE_INSTALL_PREFIX)"; \
-	if [[ -n "$$prefix" ]]; then \
-		dyld_library_path="$$prefix/usr/lib:$$prefix/basebin:/usr/lib:/basebin"; \
-		launchd_path="$$prefix/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin"; \
-	else \
-		dyld_library_path="/usr/lib:/basebin"; \
-		launchd_path="/usr/bin:/bin:/usr/sbin:/sbin"; \
-	fi; \
 	install -d "$(THEOS_STAGING_DIR)/usr/local/lib/unfaird"; \
 	install -m 0755 "$(IOS_BUILD_DIR)/$(EXECUTABLE_NAME)" "$(THEOS_STAGING_DIR)/usr/local/lib/unfaird/$(EXECUTABLE_NAME)"; \
 	shopt -s nullglob; \
 	for dylib in "$(IOS_BUILD_DIR)"/libswift*.dylib; do install -m 0755 "$$dylib" "$(THEOS_STAGING_DIR)/usr/local/lib/unfaird/"; done; \
 	install -d "$(THEOS_STAGING_DIR)/Library/LaunchDaemons"; \
-	sed \
-		-e "s|@INSTALL_PREFIX@|$$prefix|g" \
-		-e "s|@DYLD_LIBRARY_PATH@|$$dyld_library_path|g" \
-		-e "s|@LAUNCHD_PATH@|$$launchd_path|g" \
-		packaging/wiki.qaq.unfaird.plist.in > "$(THEOS_STAGING_DIR)/Library/LaunchDaemons/$(PACKAGE_NAME).plist"; \
-	chmod 0644 "$(THEOS_STAGING_DIR)/Library/LaunchDaemons/$(PACKAGE_NAME).plist"
+	install -m 0644 packaging/wiki.qaq.unfaird.plist.in "$(THEOS_STAGING_DIR)/Library/LaunchDaemons/$(PACKAGE_NAME).plist.in"
 endif

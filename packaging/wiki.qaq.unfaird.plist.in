@@ -34,6 +34,8 @@
         <string>@DYLD_LIBRARY_PATH@</string>
         <key>PATH</key>
         <string>@LAUNCHD_PATH@</string>
+        <key>UNFAIRD_JB_PREFIX</key>
+        <string>@INSTALL_PREFIX@</string>
     </dict>
     <key>StandardOutPath</key>
     <string>/var/tmp/unfaird/logs/unfaird.log</string>
