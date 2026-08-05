@@ -1,9 +1,11 @@
 #include "UnfairSupport.h"
 
 #include <dlfcn.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -32,6 +34,27 @@ static void set_error(char *error, size_t error_size, const char *format, ...) {
 static void *open_libjailbreak(char *error, size_t error_size) {
     if (dlsym(RTLD_DEFAULT, "jbclient_initialize_primitives") != NULL) {
         return RTLD_DEFAULT;
+    }
+
+    // Roothide assigns a randomized jailbreak root on each device, and unfaird
+    // publishes the resolved prefix through its launchd environment.
+    const char *prefix = getenv("UNFAIRD_JB_PREFIX");
+    if (prefix != NULL && prefix[0] != '\0') {
+        const char *suffixes[] = {
+            "/basebin/libjailbreak.dylib",
+            "/usr/lib/libjailbreak.dylib",
+        };
+        for (size_t i = 0; i < sizeof(suffixes) / sizeof(suffixes[0]); i++) {
+            char path[PATH_MAX];
+            int written = snprintf(path, sizeof(path), "%s%s", prefix, suffixes[i]);
+            if (written <= 0 || (size_t)written >= sizeof(path)) {
+                continue;
+            }
+            void *handle = dlopen(path, RTLD_NOW | RTLD_LOCAL);
+            if (handle != NULL) {
+                return handle;
+            }
+        }
     }
 
     const char *paths[] = {

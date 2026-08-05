@@ -57,11 +57,9 @@ Manual iOS HTTP service:
 
 The iOS process decrypts in-process on rootless and roothide environments.
 Encrypted binaries are staged at the canonical app container root. Every device
-uses the same mapping lifecycle: map the vnode read-only, promote its VM entry
-to executable with kernel primitives, call mremap_encrypted, restore the exact
-read-only VM flags, and copy the decrypted bytes.
-XNU 8020 also scopes its legacy kernel credential across signature registration
-and mremap_encrypted, then restores the original credential before the copy.
+uses the same mapping lifecycle across SPTM, PPL, and earlier XNU kernels: map
+the vnode with PROT_READ, call mremap_encrypted with
+CRYPTID_MODEL_ENCRYPTION, copy the decrypted bytes, and unmap the region.
 
 launchd service:
   launchctl print system/wiki.qaq.unfaird

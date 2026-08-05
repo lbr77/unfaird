@@ -70,8 +70,9 @@ scp root@ip:/var/tmp/Example.unfair.ipa ./Example.unfair.ipa
 The iOS package flow copies the extracted `.app` bundle into a temporary UUID
 container under `/var/containers/Bundle/Application`, sets installed-app
 ownership, prepares decryption permissions through jailbreak primitives, maps
-encrypted regions with `PROT_READ | PROT_EXEC`, writes decrypted bytes back into
-the output payload, then removes the staging container.
+encrypted regions with `PROT_READ`, applies the FairPlay pager with
+`CRYPTID_MODEL_ENCRYPTION`, writes decrypted bytes back into the output payload,
+then removes the staging container.
 
 The output IPA omits `Payload/*.app/SC_Info/**` because those FairPlay support
 files can contain user-specific account data. The staged app copy still uses

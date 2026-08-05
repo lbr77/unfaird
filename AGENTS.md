@@ -61,8 +61,8 @@ These are fixed runtime contracts.
 - Resolve `$TMPDIR` dynamically at process runtime. Launchd can change it across daemon starts.
 - Do not override, rewrite, or sandbox-remap `TMPDIR` for decrypt/package runs.
 - Serialize package processing because UnfairKit changes the process working directory while decrypting staged binaries.
-- Keep the KRW mapping transition thread-scoped to the serialized package operation: map the vnode read-only, promote it to executable for `mremap_encrypted`, restore its original read-only VM flags, then copy the plaintext.
-- Run the iOS daemon as root. Modern XNU retains the process credential and clears its private sandbox slot. XNU 8020 scopes a kernel-credential lease from file-signature registration through VM-flag restoration, then restores the kernel MAC label and original credential before reading plaintext.
+- Use one encrypted mapping lifecycle on every supported kernel: `mmap(PROT_READ, MAP_PRIVATE)`, `mremap_encrypted(..., CRYPTID_MODEL_ENCRYPTION)`, copy the plaintext, then `munmap`.
+- Run the iOS daemon as root and prepare jailbreak primitives plus the platform code-signing flag before staging and decrypting app binaries.
 - Preserve mtime and chmod from the IPA entries during extraction and when replacing entries in the output IPA.
 - Keep temporary `.sinf` copies metadata-preserving.
 
@@ -72,7 +72,7 @@ Use the scripts in `deploy/` for macOS install and service management.
 
 Use Theos package output from `debs/` for iOS apt install. The launchd label is `wiki.qaq.unfaird`.
 
-The iOS runtime requires jailbreak-provided `libjailbreak.dylib`. Rootless and roothide share one runtime path: resolve the jailbreak library through `UNFAIRD_JB_PREFIX`, dyld, or `/var/jb`, stage encrypted binaries under `/var/containers/Bundle/Application`, and use the same reversible KRW mapping transition around `mremap_encrypted`.
+The iOS runtime requires jailbreak-provided `libjailbreak.dylib`. Rootless and roothide share one runtime path: resolve the jailbreak library through `UNFAIRD_JB_PREFIX`, dyld, or `/var/jb`, stage encrypted binaries under `/var/containers/Bundle/Application`, and use the same read-only model-encryption mapping lifecycle.
 
 Packaging is prefix-agnostic. Theos resolves `rootless` to a `/var/jb` install prefix and `roothide` to an empty prefix with `iphoneos-arm64e` arch, and a roothide jbroot is randomized per device. So the staged launchd plist keeps its `@INSTALL_PREFIX@`, `@DYLD_LIBRARY_PATH@` and `@LAUNCHD_PATH@` placeholders, and `layout/DEBIAN/postinst` derives the prefix from its own `<prefix>/var/lib/dpkg/info/...` path and renders them on device. Never re-introduce build-time prefix substitution in the Makefile: it cannot express a roothide jbroot.
 

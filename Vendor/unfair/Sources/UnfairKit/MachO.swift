@@ -26,11 +26,6 @@ struct EncryptionInfo {
     var cryptid: UInt32
 }
 
-struct CodeSignatureInfo {
-    var dataoff: UInt32
-    var datasize: UInt32
-}
-
 struct MachOInspection {
     var hasEncryptionInfo: Bool
     var cryptid: UInt32
@@ -40,7 +35,6 @@ enum MachOInspector {
     private static let fatCigam = UInt32(FAT_CIGAM)
     private static let mhMagic64 = UInt32(MH_MAGIC_64)
     private static let lcEncryptionInfo64 = UInt32(LC_ENCRYPTION_INFO_64)
-    private static let lcCodeSignature = UInt32(LC_CODE_SIGNATURE)
     private static let cpuTypeArm64 = UInt32(bitPattern: CPU_TYPE_ARM64)
     private static let cpuSubtypeMask = UInt32(CPU_SUBTYPE_MASK)
     private static let cpuSubtypeArm64All = UInt32(CPU_SUBTYPE_ARM64_ALL)
@@ -188,51 +182,6 @@ enum MachOInspector {
                     cryptsize: info.cryptsize,
                     cryptid: info.cryptid
                 )
-            }
-
-            commandOffset += Int(command.cmdsize)
-        }
-
-        return nil
-    }
-
-    static func findCodeSignatureInfo(base: UnsafeRawPointer, size: Int) throws -> CodeSignatureInfo? {
-        guard hasRange(size: size, offset: 0, length: MemoryLayout<mach_header_64>.size) else {
-            throw UnfairError.invalidMachO("invalid Mach-O header")
-        }
-
-        let header = base.load(as: mach_header_64.self)
-        guard UInt32(header.magic) == mhMagic64,
-              UInt32(bitPattern: header.cputype) == cpuTypeArm64,
-              isSupportedArm64Subtype(UInt32(bitPattern: header.cpusubtype)) else {
-            throw UnfairError.invalidMachO("invalid Mach-O header")
-        }
-
-        guard hasRange(size: size, offset: MemoryLayout<mach_header_64>.size, length: Int(header.sizeofcmds)) else {
-            throw UnfairError.invalidMachO("invalid load command range")
-        }
-
-        var commandOffset = MemoryLayout<mach_header_64>.size
-        for _ in 0..<header.ncmds {
-            guard hasRange(size: size, offset: commandOffset, length: MemoryLayout<load_command>.size) else {
-                throw UnfairError.invalidMachO("invalid load command")
-            }
-
-            let command = base.advanced(by: commandOffset).load(as: load_command.self)
-            guard command.cmdsize >= UInt32(MemoryLayout<load_command>.size),
-                  hasRange(size: size, offset: commandOffset, length: Int(command.cmdsize)) else {
-                throw UnfairError.invalidMachO("invalid load command size")
-            }
-
-            if command.cmd == lcCodeSignature {
-                guard command.cmdsize >= UInt32(MemoryLayout<linkedit_data_command>.size) else {
-                    throw UnfairError.invalidMachO("invalid code signature command")
-                }
-                let info = base.advanced(by: commandOffset).load(as: linkedit_data_command.self)
-                guard hasRange(size: size, offset: Int(info.dataoff), length: Int(info.datasize)) else {
-                    throw UnfairError.invalidMachO("invalid code signature range")
-                }
-                return CodeSignatureInfo(dataoff: info.dataoff, datasize: info.datasize)
             }
 
             commandOffset += Int(command.cmdsize)

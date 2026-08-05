@@ -3,17 +3,9 @@ import ZIPFoundation
 
 public final class PackageProcessor {
     private let logger: UnfairLogger
-    private let decryptionPreparer: BinaryDecryptor.DecryptionPreparer?
-    private let encryptedRegionMapper: BinaryDecryptor.EncryptedRegionMapper?
 
-    public init(
-        logger: UnfairLogger = UnfairLogger(),
-        decryptionPreparer: BinaryDecryptor.DecryptionPreparer? = nil,
-        encryptedRegionMapper: BinaryDecryptor.EncryptedRegionMapper? = nil
-    ) {
+    public init(logger: UnfairLogger = UnfairLogger()) {
         self.logger = logger
-        self.decryptionPreparer = decryptionPreparer
-        self.encryptedRegionMapper = encryptedRegionMapper
     }
 
     public func process(input: URL, output: URL, workingDirectory providedWorkingDirectory: URL? = nil) throws {
@@ -95,11 +87,7 @@ public final class PackageProcessor {
         let outputRecords = try MachOInspector.scanBinaries(appURL: outputApp, label: label)
         let outputsByDisplayPath = Dictionary(uniqueKeysWithValues: outputRecords.map { ($0.displayPath, $0) })
         var decryptedOutputRecords: [MachORecord] = []
-        let decryptor = BinaryDecryptor(
-            logger: logger,
-            decryptionPreparer: decryptionPreparer,
-            encryptedRegionMapper: encryptedRegionMapper
-        )
+        let decryptor = BinaryDecryptor(logger: logger)
         let previousDirectory = FileManager.default.currentDirectoryPath
         defer { FileManager.default.changeCurrentDirectoryPath(previousDirectory) }
 
@@ -161,11 +149,7 @@ public final class PackageProcessor {
     }
 
     private func decrypt(records: [MachORecord], rootSinf: URL) throws {
-        let decryptor = BinaryDecryptor(
-            logger: logger,
-            decryptionPreparer: decryptionPreparer,
-            encryptedRegionMapper: encryptedRegionMapper
-        )
+        let decryptor = BinaryDecryptor(logger: logger)
         let previousDirectory = FileManager.default.currentDirectoryPath
         defer { FileManager.default.changeCurrentDirectoryPath(previousDirectory) }
 
