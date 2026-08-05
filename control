@@ -3,7 +3,7 @@ Name: unfaird
 Version: 0.1.0
 Architecture: iphoneos-arm64
 Description: Local HTTP IPA decrypt daemon for iOS.
- Requires jailbreak runtime paths for libjailbreak.dylib and appinst.
+ Requires jailbreak runtime paths for libjailbreak.dylib.
 Section: Utilities
 Maintainer: LiBr <me@nvme0n1p.dev>
 Author: LiBr <me@nvme0n1p.dev>

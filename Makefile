@@ -111,5 +111,5 @@ after-stage:: ios-release
 	shopt -s nullglob; \
 	for dylib in "$(IOS_BUILD_DIR)"/libswift*.dylib; do install -m 0755 "$$dylib" "$(THEOS_STAGING_DIR)/usr/local/lib/unfaird/"; done; \
 	install -d "$(THEOS_STAGING_DIR)/Library/LaunchDaemons"; \
-	install -m 0644 packaging/wiki.qaq.unfaird.plist.in "$(THEOS_STAGING_DIR)/Library/LaunchDaemons/$(PACKAGE_NAME).plist"
+	install -m 0644 packaging/wiki.qaq.unfaird.plist.in "$(THEOS_STAGING_DIR)/Library/LaunchDaemons/$(PACKAGE_NAME).plist.in"
 endif

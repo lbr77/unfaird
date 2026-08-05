@@ -5,8 +5,8 @@
 #   scripts/package.sh rootless               # one scheme
 #   scripts/package.sh rootless roothide ''   # '' means the rootful scheme
 #
-# Each scheme gets its own Theos staging root so the runs cannot clobber each
-# other, and every produced deb is copied into debs/ under its scheme name.
+# Each invocation and scheme gets its own Theos staging, build-output and package
+# directories. Produced debs are copied into debs/ under their scheme names.
 #
 # Requirements per scheme:
 #   rootless  standard Theos (mod/rootless -> prefix /var/jb, iphoneos-arm64)
@@ -47,6 +47,8 @@ scheme_supported() {
 }
 
 mkdir -p "$package_dir" "$log_dir"
+run_dir="$(mktemp -d "$log_dir/run.XXXXXX")"
+run_name="${run_dir##*/}"
 
 built=()
 skipped=()
@@ -62,37 +64,37 @@ for scheme in "${schemes[@]}"; do
   fi
 
   echo "== $label: building"
-  staging="_$label"
-  log="$log_dir/$label.log"
+  staging="_${label}_${run_name//./_}"
+  scheme_dir="$run_dir/packages/$label"
+  ios_build_dir="$run_dir/ios-$label"
+  log="$run_dir/$label.log"
 
-  # A dedicated staging dir name keeps each scheme's DEBIAN/ and payload apart.
-  # Removing it first stops a previous scheme's tree from leaking into this deb.
-  rm -rf ".theos/$staging" ".theos/${staging}tmp"
-
-  before="$(ls -1 "$package_dir" 2>/dev/null | sort)"
+  mkdir -p "$scheme_dir"
 
   if make package \
       THEOS_PACKAGE_SCHEME="$scheme" \
       THEOS_STAGING_DIR_NAME="$staging" \
-      THEOS_PACKAGE_DIR_NAME="$package_dir" \
+      THEOS_PACKAGE_DIR_NAME="$scheme_dir" \
+      IOS_BUILD_DIR="$ios_build_dir" \
       FINALPACKAGE=1 \
       >"$log" 2>&1; then
-    after="$(ls -1 "$package_dir" 2>/dev/null | sort)"
-    new="$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after") | grep '\.deb$' || true)"
+    shopt -s nullglob
+    produced=("$scheme_dir"/*.deb)
+    shopt -u nullglob
 
-    if [[ -z "$new" ]]; then
-      echo "   built, but no new deb appeared in $package_dir/ (see $log)"
+    if [[ ${#produced[@]} -eq 0 ]]; then
+      echo "   built, but no deb appeared in $scheme_dir/ (see $log)"
       failed+=("$label")
       continue
     fi
 
-    while IFS= read -r deb; do
-      [[ -z "$deb" ]] && continue
+    for source in "${produced[@]}"; do
+      deb="${source##*/}"
       renamed="${deb%.deb}_$label.deb"
-      mv "$package_dir/$deb" "$package_dir/$renamed"
+      mv "$source" "$package_dir/$renamed"
       echo "   $package_dir/$renamed"
       built+=("$package_dir/$renamed")
-    done <<< "$new"
+    done
   else
     echo "   FAILED (see $log)"
     tail -n 20 "$log" | sed 's/^/   | /'

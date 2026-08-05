@@ -36,6 +36,7 @@ case "$1" in
     if command -v launchctl >/dev/null 2>&1; then
       launchctl bootout system/$LABEL >/dev/null 2>&1 || launchctl unload "$PLIST" >/dev/null 2>&1 || true
     fi
+    rm -f "$PLIST"
     ;;
 esac
 

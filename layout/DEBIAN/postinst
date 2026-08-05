@@ -49,22 +49,13 @@ find_libjailbreak() {
   return 1
 }
 
-find_executable() {
-  for candidate in "$@"; do
-    if [ -x "$candidate" ]; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
-  return 1
-}
-
 # The staged plist ships with @INSTALL_PREFIX@/@DYLD_LIBRARY_PATH@/@LAUNCHD_PATH@
 # placeholders because roothide's jbroot is only known here, on device.
 render_plist() {
-  plist="$1"
-  prefix="$2"
-  libjailbreak_dir="$3"
+  template="$1"
+  plist="$2"
+  prefix="$3"
+  libjailbreak_dir="$4"
 
   if [ -n "$prefix" ]; then
     dyld_library_path="$prefix/usr/local/lib/unfaird:$prefix/usr/lib:$prefix/basebin:/usr/lib:/basebin"
@@ -82,20 +73,21 @@ render_plist() {
     -e "s|@INSTALL_PREFIX@|$prefix|g" \
     -e "s|@DYLD_LIBRARY_PATH@|$dyld_library_path|g" \
     -e "s|@LAUNCHD_PATH@|$launchd_path|g" \
-    "$plist" > "$tmp"
+    "$template" > "$tmp"
   mv "$tmp" "$plist"
 }
 
 PREFIX="$(resolve_prefix)"
 BINARY="$PREFIX/usr/local/lib/unfaird/UnfairDaemon"
+PLIST_TEMPLATE="$PREFIX/Library/LaunchDaemons/$LABEL.plist.in"
 PLIST="$PREFIX/Library/LaunchDaemons/$LABEL.plist"
 
 if [ ! -x "$BINARY" ]; then
   echo "$LABEL cannot find its daemon at $BINARY" >&2
   exit 1
 fi
-if [ ! -f "$PLIST" ]; then
-  echo "$LABEL cannot find its launchd plist at $PLIST" >&2
+if [ ! -f "$PLIST_TEMPLATE" ]; then
+  echo "$LABEL cannot find its launchd plist template at $PLIST_TEMPLATE" >&2
   exit 1
 fi
 
@@ -105,13 +97,7 @@ if [ -z "$LIBJAILBREAK" ]; then
   exit 1
 fi
 
-APPINST="$(find_executable "$PREFIX/usr/bin/appinst" "$PREFIX/bin/appinst" /var/jb/usr/bin/appinst /usr/bin/appinst /bin/appinst || true)"
-if [ -z "$APPINST" ]; then
-  echo "$LABEL requires appinst under $PREFIX/usr/bin, /usr/bin, or /bin" >&2
-  exit 1
-fi
-
-render_plist "$PLIST" "$PREFIX" "$(dirname "$LIBJAILBREAK")"
+render_plist "$PLIST_TEMPLATE" "$PLIST" "$PREFIX" "$(dirname "$LIBJAILBREAK")"
 
 install -d -m 0755 /var/tmp/unfaird/jobs /var/tmp/unfaird/logs /var/folders/bg/unfaird/T /var/folders/bg/unfaird/X
 chown -R root:wheel /var/tmp/unfaird /var/folders/bg/unfaird 2>/dev/null || true
