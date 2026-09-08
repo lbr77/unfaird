@@ -23,14 +23,15 @@ func routes(_ app: Application) throws {
         HealthResponse.current
     }
 
-    app.post("api", "v1", "decrypt") { req -> EventLoopFuture<DecryptResponse> in
+    app.on(.POST, "api", "v1", "decrypt", body: .stream) { req -> EventLoopFuture<DecryptResponse> in
         if let contentLength = req.headers.first(name: .contentLength).flatMap(Int64.init),
            contentLength > DecryptService.maxUploadBytes {
             throw Abort(.payloadTooLarge, reason: "upload limit is 8GB")
         }
-        let upload = try req.content.decode(DecryptUpload.self)
-        return req.application.threadPool.runIfActive(eventLoop: req.eventLoop) {
-            try DecryptService().run(upload)
+        return DecryptUploadReader.read(from: req).flatMap { upload in
+            req.application.threadPool.runIfActive(eventLoop: req.eventLoop) {
+                try DecryptService().run(upload)
+            }
         }
     }
 

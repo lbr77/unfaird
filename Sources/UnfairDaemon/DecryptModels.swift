@@ -1,12 +1,11 @@
 import Vapor
 
 struct DecryptUpload: Content {
-    var ipa: File?
+    var ipa: StagedIPAFile? = nil
     var url: String?
     var ipaURL: String?
 
     enum CodingKeys: String, CodingKey {
-        case ipa
         case url
         case ipaURL = "ipa_url"
     }
@@ -14,6 +13,11 @@ struct DecryptUpload: Content {
     var sourceURLString: String? {
         ipaURL ?? url
     }
+}
+
+struct StagedIPAFile {
+    let filename: String
+    let url: URL
 }
 
 struct DecryptResponse: Content {
