@@ -9,6 +9,7 @@ struct DecryptService {
     private static let cleanupIntervalSeconds = 60
     private static let diskReserveBytes: Int64 = 16 * 1024 * 1024 * 1024
     private static let workDirectoryPath = "/var/tmp/unfaird/jobs"
+    private static let uploadDirectoryPath = "/var/tmp/unfaird/uploads"
     private static let runnerTimeoutSeconds = 15 * 60
     private static let cleanupLock = NSLock()
     private static var cleanupTimer: DispatchSourceTimer?
@@ -19,7 +20,22 @@ struct DecryptService {
             withIntermediateDirectories: true,
             attributes: [.posixPermissions: 0o700]
         )
+        try FileManager.default.createDirectory(
+            at: uploadDirectory(),
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
         try removeJobDirectories()
+        try removeStagedUploads()
+    }
+
+    static func makeStagedUploadURL() throws -> URL {
+        try FileManager.default.createDirectory(
+            at: uploadDirectory(),
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        return uploadDirectory().appendingPathComponent("\(UUID().uuidString).ipa")
     }
 
     static func startExpiredJobCleanup() {
@@ -42,6 +58,11 @@ struct DecryptService {
     }
 
     func run(_ upload: DecryptUpload) throws -> DecryptResponse {
+        defer {
+            if let staged = upload.ipa?.url {
+                try? FileManager.default.removeItem(at: staged)
+            }
+        }
         try validate(upload)
 
         let job = try Self.createJob()
@@ -115,6 +136,10 @@ struct DecryptService {
         URL(fileURLWithPath: workDirectoryPath, isDirectory: true)
     }
 
+    private static func uploadDirectory() -> URL {
+        URL(fileURLWithPath: uploadDirectoryPath, isDirectory: true)
+    }
+
     private static func cleanupExpiredJobs() {
         do {
             try cleanupExpiredJobDirectories(now: currentTimestamp())
@@ -158,6 +183,17 @@ struct DecryptService {
         }
     }
 
+    private static func removeStagedUploads() throws {
+        let files = try FileManager.default.contentsOfDirectory(
+            at: uploadDirectory(),
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )
+        for file in files {
+            try? FileManager.default.removeItem(at: file)
+        }
+    }
+
     private static func isDirectory(_ url: URL) throws -> Bool {
         let values = try url.resourceValues(forKeys: [.isDirectoryKey])
         return values.isDirectory == true
@@ -184,7 +220,11 @@ struct DecryptService {
 
         if let file = upload.ipa {
             try validateIPA(filename: file.filename)
-            guard Int64(file.data.readableBytes) <= Self.maxUploadBytes else {
+            let size = (try FileManager.default.attributesOfItem(atPath: file.url.path)[.size] as? NSNumber)?.int64Value ?? 0
+            guard size > 0 else {
+                throw Abort(.badRequest, reason: "empty upload")
+            }
+            guard size <= Self.maxUploadBytes else {
                 throw Abort(.payloadTooLarge, reason: "upload limit is 8GB")
             }
         }
@@ -202,7 +242,7 @@ struct DecryptService {
 
     private func write(_ upload: DecryptUpload, to url: URL) throws {
         if let file = upload.ipa {
-            try write(file, to: url)
+            try relocate(file.url, to: url)
             return
         }
         if let urlString = upload.sourceURLString {
@@ -212,15 +252,16 @@ struct DecryptService {
         throw Abort(.badRequest, reason: "ipa source required")
     }
 
-    private func write(_ file: File, to url: URL) throws {
-        var buffer = file.data
-        guard let data = buffer.readData(length: buffer.readableBytes) else {
-            throw Abort(.badRequest, reason: "empty upload")
+    private func relocate(_ source: URL, to destination: URL) throws {
+        if FileManager.default.fileExists(atPath: destination.path) {
+            try FileManager.default.removeItem(at: destination)
         }
-        guard Int64(data.count) <= Self.maxUploadBytes else {
-            throw Abort(.payloadTooLarge, reason: "upload limit is 8GB")
+        do {
+            try FileManager.default.moveItem(at: source, to: destination)
+        } catch {
+            try FileManager.default.copyItem(at: source, to: destination)
+            try FileManager.default.removeItem(at: source)
         }
-        try data.write(to: url, options: .atomic)
     }
 
     private func downloadIPA(from sourceURL: URL, to destination: URL) throws {
